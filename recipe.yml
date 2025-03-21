@@ -1,8 +1,8 @@
-name: Nvidia Experimental Custom
-id: nvidia-exp-custom
+name: Vanilla OS Custom Image Base
+id: vos-custom-base
 stages:
   - id: build
-    base: ghcr.io/vanilla-os/nvidia-exp:dev
+    base: ghcr.io/vanilla-os/nvidia-exp:main
     singlelayer: false
     labels:
       maintainer: self-maintained # Optionally, Replace this with your name
@@ -23,26 +23,85 @@ stages:
 
       # Put your custom actions below this comment
 
-      - name: install-tailscale
+      - name: add-debian-sources
         type: shell
         commands:
-          - mkdir -p --mode=0755 /usr/share/keyrings
-          - curl -fsSL https://pkgs.tailscale.com/stable/debian/sid.noarmor.gpg | tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null
-          - curl -fsSL https://pkgs.tailscale.com/stable/debian/sid.tailscale-keyring.list | tee /etc/apt/sources.list.d/tailscale.list
-          - apt-get update && apt-get install -y tailscale
+          - mv /etc/sid.sources /etc/apt/sources.list.d/
+          - mv /etc/experimental.sources /etc/apt/sources.list.d/
+          - mv /etc/trixie.sources /etc/apt/sources.list.d/
+          - mv /etc/apt/sources.list.d/vanilla-base.sources /etc/
+          - apt update
 
-      - name: install-rtl8188eus
+      - name: uninstall-waydroid
         type: shell
         commands:
-          - apt-get install -y git build-essential linux-headers-amd64 dkms
-          - git clone https://github.com/aircrack-ng/rtl8188eus
-          - cd rtl8188eus
-          - make KVER=$(ls /lib/modules | head -n 1) KSRC=/lib/modules/$(ls /lib/modules | head -n 1)/build
-          - make install KVER=$(ls /lib/modules | head -n 1) KSRC=/lib/modules/$(ls /lib/modules | head -n 1)/build
-          - echo 'blacklist r8188eu' | tee -a '/etc/modprobe.d/realtek.conf'
-          - echo 'blacklist rtl8xxxu' | tee -a '/etc/modprobe.d/realtek.conf'
-          - cd ..
-          - rm -f -r rtl8188eus
+          - dkms uninstall waydroid-binder/1 -k $(cat /usr/share/vanilla/kernel-version)
+          - dkms uninstall waydroid-ashmem/1 -k $(cat /usr/share/vanilla/kernel-version)
+          - rm -f -r /sources/waydroid-modules
+          - rm -f -r /usr/src/waydroid-binder-1
+          - rm -f -r /usr/src/waydroid-ashmem-1
+          - rm -f /usr/bin/waydroid
+          - rm -f /usr/share/vso/apx/stacks/vso-waydroid.yaml
+          - rm -f /etc/modules.load.d/waydroid.conf
+          - rm -f /etc/udev/rules.d/99-waydroid.rules
+
+      # - name: upgrade-kernel
+      #   type: shell
+      #   commands:
+      #     - apt remove -y linux-image-amd64 linux-headers-amd64
+      #     - apt install -t experimental -y linux-image-amd64 linux-headers-amd64
+      #     - rm -f /usr/share/vanilla/kernel-version
+      #     - echo "$(ls -1 /usr/lib/modules | tail -n 1)" > /usr/share/vanilla/kernel-version
+      #     - mv /boot/vmlinuz-6.13-amd64 /boot/vmlinuz-6.13.0-amd64
+      #     - mv /boot/initrd.img-6.13-amd64 /boot/initrd.img-6.13.0-amd64
+      #     - mv /boot/System.map-6.13-amd64 /boot/System.map-6.13.0-amd64
+      #     - mv /boot/config-6.13-amd64 /boot/config-6.13.0-amd64
+      #     - mv /lib/modules/6.13-amd64 /lib/modules/6.13.0-amd64
+      #     - ln -s /boot/vmlinuz-6.13.0-amd64 /boot/vmlinuz-6.13-amd64
+      #     - ln -s /boot/initrd.img-6.13.0-amd64 /boot/initrd.img-6.13-amd64
+      #     - ln -s /boot/System.map-6.13.0-amd64 /boot/System.map-6.13-amd64
+      #     - ln -s /boot/config-6.13.0-amd64 /boot/config-6.13-amd64
+      #     - ln -s /lib/modules/6.13.0-amd64 /lib/modules/6.13-amd64
+
+      - name: upgrade-mesa
+        type: shell
+        commands:
+          - apt install -t sid -y mesa-vulkan-drivers libgl1-mesa-dri libglx-mesa0 mesa-utils
+
+      - name: install-gnome-48
+        type: shell
+        commands:
+          - apt install -t trixie --fix-missing --fix-broken -y libtinysparql-3.0-0=3.8.2-5+b1
+          - apt-mark hold libtinysparql-3.0-0
+
+          - apt-mark unhold gnome-control-center
+
+          - apt install -t sid --fix-missing --fix-broken -y gdm3 xorg gnome-session gnome-shell gnome-control-center gnome-shell-extensions gnome-browser-connector dbus-x11 evolution-data-server geoclue-2.0 gjs mutter xdg-desktop-portal xdg-desktop-portal-gnome xdg-desktop-portal-gtk gsettings-desktop-schemas libatk-adaptor libnotify-bin ibus-gtk ibus-gtk3 ibus-gtk4 libtracker-sparql-3.0-0 libglib2.0-bin libblockdev-crypto3 libpam-gnome-keyring libproxy1-plugin-gsettings libwmf0.2-7-gtk libgdk-pixbuf2.0-bin libjxl-gdk-pixbuf libavif-gdk-pixbuf heif-gdk-pixbuf webp-pixbuf-loader ffmpegthumbnailer gnome-epub-thumbnailer ooo-thumbnailer nautilus nautilus-share python3-nautilus gnome-bluetooth-sendto gnome-color-manager gnome-menus gnome-online-accounts blackbox-terminal adwaita-icon-theme
+          - apt-mark hold libtracker-sparql-3.0-0 tracker-miner-fs
+
+      # - name: install-gnome-48-control-center
+      #   type: shell
+      #   commands:
+      #     - wget https://github.com/deezhizyu/gnome-control-center/releases/download/48-beta2/gnome-control-center.tar.xz
+      #     - mkdir ./gnome-control-center
+      #     - tar -xf gnome-control-center.tar.xz -C ./gnome-control-center
+
+      #     - dpkg -i ./gnome-control-center/gnome-control-center-data_48.0~99-orchid_all.deb
+      #     - dpkg -i ./gnome-control-center/gnome-control-center_48.0~99-orchid_amd64.deb
+      #     - apt -y install -f
+      #     - apt-mark hold gnome-control-center
+
+      #     - rm -f -r ./gnome-control-center
+      #     - rm -f gnome-control-center.tar.xz
+
+      - name: remove-debian-sources
+        type: shell
+        commands:
+          - rm /etc/apt/sources.list.d/sid.sources
+          - rm /etc/apt/sources.list.d/experimental.sources
+          - rm /etc/apt/sources.list.d/trixie.sources
+          - mv /etc/vanilla-base.sources /etc/apt/sources.list.d/
+          - apt update
 
       # Put your custom actions above this comment
 
