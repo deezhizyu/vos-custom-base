@@ -3,6 +3,6 @@ This is my personal custom image based on the [vanilla-os/nvidia-exp](https://gi
 ## Additions
 - Latest linux kernel from sid
 - GNOME 48
-<!-- - Custom Mutter with wayland cursor lag fix -->
 - Latest Mesa and Nvidia drivers
 - Removed Waydroid
+<!-- - Custom Mutter with wayland cursor lag fix -->
